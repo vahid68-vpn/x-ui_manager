@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# --- تعریف استایل‌های پیشرفته ---
+# --- Color Definitions ---
 RED='\033[1;31m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
@@ -8,62 +8,64 @@ BLUE='\033[1;34m'
 PURPLE='\033[1;35m'
 CYAN='\033[1;36m'
 BOLD='\033[1m'
-UNDERLINE='\033[4m'
-NC='\033[0m' # خنثی
+NC='\033[0m' 
 
-# تابع برای کشیدن خط جداکننده شیک
 draw_line() {
     echo -e "${CYAN}------------------------------------------------------------${NC}"
 }
 
 clear
 draw_line
-echo -e "      ${BOLD}${PURPLE}🚀 سیستم هوشمند مدیریت اختصاصی شما 🚀${NC}"
+echo -e "      ${BOLD}${PURPLE}🚀 MANAGER ASSISTANT | DASTYAR-E MODIRIYAT 🚀${NC}"
 draw_line
 
-# ۱. بررسی دسترسی روت با افکت بصری
-echo -ne "${YELLOW}🔍 در حال بررسی دسترسی سیستم... ${NC}"
-sleep 1
+# 1. Root Check
+echo -ne "${YELLOW}🔍 Barresi dastresi Root... ${NC}"
 if [[ $EUID -ne 0 ]]; then
-   echo -e "${RED}[خطا]${NC}"
-   echo -e "${RED}✘ لطفا این اسکریپت را با دسترسی root اجرا کنید.${NC}"
+   echo -e "${RED}[Error]${NC}"
+   echo -e "${RED}Lotfan ba dastresi Root (sudo) ejra konid.${NC}"
    draw_line
    exit 1
 else
-   echo -e "${GREEN}[تایید شد]${NC}"
+   echo -e "${GREEN}[OK]${NC}"
 fi
 
-# ۲. نمایش منوی انتخابی حرفه‌ای
-echo -e "\n${BOLD}${UNDERLINE}لطفا یک گزینه را انتخاب کنید:${NC}"
-echo -e "  ${BLUE}1)${NC} 🛠  نصب پیش‌نیازها و آپدیت"
-echo -e "  ${BLUE}2)${NC} 👤 مدیریت کاربران"
-echo -e "  ${BLUE}3)${NC} 📊 مشاهده وضعیت سرور"
-echo -e "  ${BLUE}4)${NC} ❌ خروج"
+# 2. Information
+echo -e "${BLUE}IP Server:${NC} $(curl -s https://api.ipify.org)"
+echo -e "${BLUE}Zaman:${NC} $(date)"
+draw_line
+
+# 3. Menu
+echo -e "\n${BOLD}Lotfan yek gozine ra entekhab konid:${NC}"
+echo -e "  ${BLUE}1)${NC} 🛠  Nasbe Pishniyazha (Update & Tools)"
+echo -e "  ${BLUE}2)${NC} 👤 Modiriyat Karbaran (User Management)"
+echo -e "  ${BLUE}3)${NC} 📊 Vaziyat-e Server (System Status)"
+echo -e "  ${BLUE}4)${NC} ❌ Khorooj (Exit)"
 echo ""
-read -p "کد گزینه مورد نظر را وارد کنید [1-4]: " choice
+read -p "Adad-e gozine [1-4]: " choice
 
 case $choice in
     1)
         draw_line
-        echo -e "${YELLOW}🔄 در حال آپدیت مخازن...${NC}"
+        echo -e "${YELLOW}🔄 Dar hal-e update va nasbe abzarha...${NC}"
         apt update -y && apt install curl wget git -y
-        echo -e "${GREEN}✅ عملیات با موفقیت انجام شد.${NC}"
+        echo -e "${GREEN}✅ Amalyat ba movafaghiyat anjam shod.${NC}"
         ;;
     2)
-        echo -e "${PURPLE}👤 بخش مدیریت کاربران در نسخه بعدی اضافه می‌شود...${NC}"
+        echo -e "${PURPLE}Bakhsh-e Modiriyat dar noskhe-haye badi ezafe mishavad.${NC}"
         ;;
     3)
         draw_line
-        echo -e "${CYAN}📈 وضعیت لحظه‌ای سیستم:${NC}"
+        echo -e "${CYAN}📈 Vaziyat-e lahze-i server:${NC}"
         uptime
         free -h
         ;;
     4)
-        echo -e "${RED}👋 خروج از برنامه. موفق باشید!${NC}"
+        echo -e "${RED}👋 Khodafez! Movafagh bashid.${NC}"
         exit 0
         ;;
     *)
-        echo -e "${RED}⚠ گزینه نامعتبر است!${NC}"
+        echo -e "${RED}⚠ Gozine eshtebah ast! Dubare talash konid.${NC}"
         ;;
 esac
 
