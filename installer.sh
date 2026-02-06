@@ -1,95 +1,127 @@
 #!/bin/bash
+# ===============================================
+# XUI Advanced Installer & Manager Script
+# ===============================================
+# وحید جان عزیزم، این اسکریپت مشابه xui-assistant هست
+# با جزئیات کامل، بکاپ، نصب، منوی مدیریتی پیشرفته
 
-# --- Color definitions ---
-RED='\033[1;31m'
-GREEN='\033[1;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[1;34m'
-PLAIN='\033[0m'
+set -euo pipefail
 
-# Check root access
-[[ $EUID -ne 0 ]] && echo -e "${RED}Error: ${PLAIN}Lotfan ba karbare Root vared shavid.\n" && exit 1
+# ------------------------------
+# Colors for better readability
+# ------------------------------
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+BLUE="\e[34m"
+RESET="\e[0m"
 
-# --- Main Menu Function ---
-show_menu() {
-    clear
-    echo -e "${GREEN}======================================${PLAIN}"
-    echo -e "${GREEN}      X-UI PANEL ASSISTANT           ${PLAIN}"
-    echo -e "${GREEN}======================================${PLAIN}"
-    echo -e "  ${YELLOW}0.${PLAIN} Exit (Khorooj)"
-    echo -e "  ${YELLOW}1.${PLAIN} Install X-UI (Nasbe Panel)"
-    echo -e "  ${YELLOW}2.${PLAIN} Update X-UI (Update)"
-    echo -e "  ${YELLOW}3.${PLAIN} Uninstall X-UI (Hazf)"
-    echo -e "  ${YELLOW}4.${PLAIN} Reset Settings (Baz-neshani)"
-    echo -e "  ${YELLOW}5.${PLAIN} Change Port (Taghyire Port)"
-    echo -e "  ${YELLOW}6.${PLAIN} Check Panel Info (Etelaat)"
-    echo -e "  ${YELLOW}7.${PLAIN} Enable BBR (Sor-at bakhsh)"
-    echo -e "${GREEN}======================================${PLAIN}"
-    echo -ne "Yek gozine ra entekhab konid [0-7]: "
-    read choice
+# ------------------------------
+# Step 0: Check root
+# ------------------------------
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}Please run as root${RESET}"
+    exit 1
+fi
 
+echo -e "${BLUE}=== Step 1: Update & Upgrade System ===${RESET}"
+apt update && apt upgrade -y
+
+echo -e "${BLUE}=== Step 2: Install Dependencies ===${RESET}"
+dependencies=(curl wget jq sudo lsof net-tools unzip)
+for pkg in "${dependencies[@]}"; do
+    if ! dpkg -s "$pkg" &>/dev/null; then
+        echo -e "${YELLOW}Installing $pkg...${RESET}"
+        apt install -y "$pkg"
+    else
+        echo -e "${GREEN}$pkg already installed${RESET}"
+    fi
+done
+
+# ------------------------------
+# Step 3: Backup existing configs
+# ------------------------------
+backup_dir="/root/xui_backup_$(date +%F_%T)"
+mkdir -p "$backup_dir"
+if [ -d "/etc/x-ui" ]; then
+    echo -e "${BLUE}Backing up /etc/x-ui to $backup_dir${RESET}"
+    cp -r /etc/x-ui "$backup_dir/"
+fi
+
+# ------------------------------
+# Step 4: Download & Install Service
+# ------------------------------
+installer_url="https://raw.githubusercontent.com/dev-ir/xui-assistant/master/installer.sh"
+tmp_script="/tmp/xui_installer.sh"
+
+echo -e "${BLUE}Downloading installer...${RESET}"
+curl -Ls "$installer_url" -o "$tmp_script"
+chmod +x "$tmp_script"
+
+echo -e "${BLUE}Running installer...${RESET}"
+bash "$tmp_script"
+
+# ------------------------------
+# Step 5: Create Management Menu
+# ------------------------------
+menu_file="/usr/local/bin/xui-menu"
+cat << 'EOF' > "$menu_file"
+#!/bin/bash
+# ===============================================
+# XUI Management Menu
+# ===============================================
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+BLUE="\e[34m"
+RESET="\e[0m"
+
+service_name="x-ui"
+
+while true; do
+    echo -e "${BLUE}==== XUI Management Menu ====${RESET}"
+    echo "1) Start Service"
+    echo "2) Stop Service"
+    echo "3) Restart Service"
+    echo "4) Enable Service on Boot"
+    echo "5) Disable Service on Boot"
+    echo "6) Show Service Status"
+    echo "7) View Last 50 Logs"
+    echo "8) Backup Current Configs"
+    echo "9) Restore Last Backup"
+    echo "10) Exit"
+    read -p "Choose an option [1-10]: " choice
     case $choice in
-        0) exit 0 ;;
-        1) install_xui ;;
-        2) update_xui ;;
-        3) uninstall_xui ;;
-        4) reset_config ;;
-        5) change_port ;;
-        6) check_info ;;
-        7) enable_bbr ;;
-        *) echo -e "${RED}Gozine eshtebah ast!${PLAIN}"; sleep 2; show_menu ;;
+        1) systemctl start $service_name ;;
+        2) systemctl stop $service_name ;;
+        3) systemctl restart $service_name ;;
+        4) systemctl enable $service_name ;;
+        5) systemctl disable $service_name ;;
+        6) systemctl status $service_name ;;
+        7) journalctl -u $service_name -n 50 ;;
+        8) 
+            backup_dir="/root/xui_backup_$(date +%F_%T)"
+            mkdir -p "$backup_dir"
+            cp -r /etc/x-ui "$backup_dir/"
+            echo -e "${GREEN}Backup saved to $backup_dir${RESET}"
+            ;;
+        9) 
+            last_backup=$(ls -dt /root/xui_backup_* | head -1)
+            if [ -d "$last_backup" ]; then
+                cp -r "$last_backup"/* /etc/x-ui/
+                echo -e "${GREEN}Restored backup from $last_backup${RESET}"
+            else
+                echo -e "${RED}No backup found!${RESET}"
+            fi
+            ;;
+        10) exit 0 ;;
+        *) echo -e "${RED}Invalid option${RESET}" ;;
     esac
-}
+    echo ""
+done
+EOF
 
-# --- Functions (Hamane script-e avaliye) ---
+chmod +x "$menu_file"
 
-install_xui() {
-    echo -e "${YELLOW}Dar hal-e nasbe x-ui...${PLAIN}"
-    bash <(curl -Ls https://raw.githubusercontent.com/vaxilu/x-ui/master/install.sh)
-    back_to_menu
-}
-
-update_xui() {
-    x-ui update
-    back_to_menu
-}
-
-uninstall_xui() {
-    x-ui uninstall
-    back_to_menu
-}
-
-reset_config() {
-    x-ui setting -reset
-    back_to_menu
-}
-
-change_port() {
-    read -p "Porte jadid ra vared konid: " port
-    x-ui setting -port $port
-    back_to_menu
-}
-
-check_info() {
-    x-ui show
-    back_to_menu
-}
-
-enable_bbr() {
-    echo -e "${YELLOW}Dar hal-e faalsazi BBR...${PLAIN}"
-    # In dastoor BBR ra dar akasre serverha faal mikonad
-    echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
-    echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
-    sysctl -p
-    echo -e "${GREEN}BBR faal shod.${PLAIN}"
-    back_to_menu
-}
-
-back_to_menu() {
-    echo -e "\n${BLUE}Amalyat tamam shod.${PLAIN}"
-    read -p "Baraye barghasht be menu [Enter] ra bezanid..."
-    show_menu
-}
-
-# Start Script
-show_menu
+echo -e "${GREEN}=== Installation & Menu Setup Completed ===${RESET}"
+echo -e "You can now run '${YELLOW}xui-menu${RESET}' to manage the service."
