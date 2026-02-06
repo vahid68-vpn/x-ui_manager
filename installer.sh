@@ -1,108 +1,128 @@
 #!/bin/bash
-# ==========================================================
-# manager | XUI Installer & Manager
-# Telegram: @vahid68_vpn
-# ==========================================================
+# ==========================================
+# VortexL2 Installer
+# Fully standalone, no GitHub edits needed
+# Maintained by: Vahid
+# ==========================================
 
-set -euo pipefail
+set -e
 
-# ---------------- Colors ----------------
-BOLD="\e[1m"
-RESET="\e[0m"
-RED="\e[31m"
-GREEN="\e[32m"
-YELLOW="\e[33m"
-BLUE="\e[34m"
-CYAN="\e[36m"
-MAGENTA="\e[35m"
-WHITE="\e[97m"
+# -------- Colors --------
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# ---------------- Root Check ----------------
+# -------- Paths & Config --------
+INSTALL_DIR="/opt/vortexl2"
+BIN_PATH="/usr/local/bin/vortexl2"
+SYSTEMD_DIR="/etc/systemd/system"
+CONFIG_DIR="/etc/vortexl2"
+
+# Direct download of the ready-to-use repo zip
+REPO_URL="https://codeload.github.com/iliya-Developer/VortexL2/zip/refs/heads/main"
+
+# -------- Banner --------
+clear
+echo -e "${CYAN}"
+echo "=========================================="
+echo "        VortexL2 Installer"
+echo "        Fully standalone by Vahid"
+echo "=========================================="
+echo -e "${NC}"
+
+# -------- Root check --------
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}${BOLD}Please run as root${RESET}"
-    exit 1
+  echo -e "${RED}[ERROR] Run as root${NC}"
+  exit 1
 fi
 
-# ---------------- Center Print ----------------
-center_print() {
-    local term_width
-    term_width=$(tput cols)
-    while IFS= read -r line; do
-        local len=${#line}
-        if (( len < term_width )); then
-            local pad=$(( (term_width - len) / 2 ))
-            printf "%*s%s\n" "$pad" "" "$line"
-        else
-            echo "$line"
-        fi
-    done
-}
+# -------- OS check --------
+if ! command -v apt-get >/dev/null 2>&1; then
+  echo -e "${RED}[ERROR] Only Debian / Ubuntu supported${NC}"
+  exit 1
+fi
 
-# ---------------- Banner ----------------
-clear
-echo -e "${CYAN}${BOLD}"
-cat << 'EOF' | center_print
-manager
-      _  ____  ______       ___   __________ __________________    _   ________
-     |   | |/ / / / /  _/      /   | / ___/ ___//  _/ ___/_  __/   |  / | / /_  __/
-     |   |   / / / // / _____ / /| | \__ \\__ \ / / \__ \ / / / /| | /  |/ / / /
-     |  /   / /_/ // / _____ / ___ |___/ /__/ // / ___/ // / / ___ |/ /|  / / /
-     | /_/|_\____/___/      /_/  |_/____/____/___//____//_/ /_/  |_/_/ |_/ /_/
+# -------- Install dependencies --------
+echo -e "${YELLOW}[+] Installing system dependencies...${NC}"
+apt-get update -qq
+apt-get install -y -qq python3 python3-pip python3-venv git curl unzip iproute2 haproxy
+
+# -------- Kernel modules --------
+KERNEL_VERSION="$(uname -r)"
+echo -e "${YELLOW}[+] Installing kernel extra modules...${NC}"
+apt-get install -y -qq "linux-modules-extra-${KERNEL_VERSION}" || true
+
+echo -e "${YELLOW}[+] Loading L2TP kernel modules...${NC}"
+modprobe l2tp_core || true
+modprobe l2tp_netlink || true
+modprobe l2tp_eth || true
+
+# -------- Auto-load modules on boot --------
+echo -e "${YELLOW}[+] Configuring kernel modules autoload...${NC}"
+cat >/etc/modules-load.d/vortexl2.conf <<EOF
+l2tp_core
+l2tp_netlink
+l2tp_eth
 EOF
-echo -e "${RESET}"
 
+# -------- Cleanup old install --------
+if [ -d "$INSTALL_DIR" ]; then
+  echo -e "${YELLOW}[+] Removing old installation...${NC}"
+  rm -rf "$INSTALL_DIR"
+fi
+
+# -------- Download project --------
+echo -e "${GREEN}[+] Downloading VortexL2...${NC}"
+mkdir -p "$INSTALL_DIR"
+curl -Ls "$REPO_URL" -o /tmp/vortexl2.zip
+unzip -q /tmp/vortexl2.zip -d /tmp/
+mv /tmp/VortexL2-main/* "$INSTALL_DIR/"
+rm -rf /tmp/vortexl2.zip /tmp/VortexL2-main
+
+# -------- Python deps --------
+echo -e "${YELLOW}[+] Installing Python dependencies...${NC}"
+apt-get install -y -qq python3-yaml python3-rich || pip3 install --break-system-packages pyyaml rich
+
+# -------- Create config dir --------
+mkdir -p "$CONFIG_DIR"
+
+# -------- Create launcher --------
+echo -e "${GREEN}[+] Creating command launcher...${NC}"
+cat >"$BIN_PATH" <<EOF
+#!/bin/bash
+exec python3 $INSTALL_DIR/main.py "\$@"
+EOF
+
+chmod +x "$BIN_PATH"
+
+# -------- Systemd services --------
+echo -e "${YELLOW}[+] Installing systemd services...${NC}"
+if [ -d "$INSTALL_DIR/systemd" ]; then
+    cp $INSTALL_DIR/systemd/*.service "$SYSTEMD_DIR/" || true
+fi
+
+systemctl daemon-reexec
+systemctl daemon-reload
+
+# -------- Disable legacy services --------
+systemctl stop vortexl2-socat.service 2>/dev/null || true
+systemctl disable vortexl2-socat.service 2>/dev/null || true
+
+# -------- Enable main services --------
+systemctl enable vortexl2.service
+systemctl restart vortexl2.service
+
+# -------- Finish --------
+echo -e "${GREEN}"
+echo "=========================================="
+echo " VortexL2 installation completed"
 echo
-printf "%*s%s\n" $(( ($(tput cols) - 22)/2 )) "" "Telegram: @vahid68_vpn"
+echo " Run: vortexl2"
 echo
-
-# ---------------- Manager Menu ----------------
-SERVICE="x-ui"
-while true; do
-    echo -e "${MAGENTA}${BOLD}==== manager | Control Panel ====${RESET}"
-    echo -e "${CYAN}1) Start Service${RESET}"
-    echo -e "${CYAN}2) Stop Service${RESET}"
-    echo -e "${CYAN}3) Restart Service${RESET}"
-    echo -e "${CYAN}4) Enable on Boot${RESET}"
-    echo -e "${CYAN}5) Disable on Boot${RESET}"
-    echo -e "${CYAN}6) Service Status${RESET}"
-    echo -e "${CYAN}7) View Logs (last 50)${RESET}"
-    echo -e "${CYAN}8) Backup Configs${RESET}"
-    echo -e "${CYAN}9) Restore Last Backup${RESET}"
-    echo -e "${CYAN}10) Telegram Info${RESET}"
-    echo -e "${CYAN}0) Exit${RESET}"
-    echo
-    read -p "Select option: " opt
-
-    case $opt in
-        1) systemctl start $SERVICE ;;
-        2) systemctl stop $SERVICE ;;
-        3) systemctl restart $SERVICE ;;
-        4) systemctl enable $SERVICE ;;
-        5) systemctl disable $SERVICE ;;
-        6) systemctl status $SERVICE ;;
-        7) journalctl -u $SERVICE -n 50 ;;
-        8)
-            BD="/root/manager_backup_$(date +%F_%H-%M-%S)"
-            mkdir -p "$BD"
-            cp -r /etc/x-ui "$BD/"
-            echo -e "${GREEN}Backup created: $BD${RESET}"
-            sleep 2
-            ;;
-        9)
-            LAST=$(ls -dt /root/manager_backup_* 2>/dev/null | head -1)
-            if [ -n "$LAST" ]; then
-                cp -r "$LAST"/* /etc/x-ui/
-                echo -e "${GREEN}Restored from $LAST${RESET}"
-            else
-                echo -e "${RED}No backup found${RESET}"
-            fi
-            sleep 2
-            ;;
-        10)
-            echo -e "${GREEN}${BOLD}Telegram: @vahid68_vpn${RESET}"
-            sleep 3
-            ;;
-        0) exit 0 ;;
-        *) echo -e "${RED}Invalid option${RESET}"; sleep 1 ;;
-    esac
-done
+echo " Security notice:"
+echo " L2TPv3 has NO encryption."
+echo " Use IPSec / WireGuard if needed."
+echo "=========================================="
+echo -e "${NC}"
