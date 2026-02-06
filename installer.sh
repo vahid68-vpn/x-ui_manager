@@ -1,46 +1,33 @@
 #!/bin/bash
 
-# Color definitions
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[0;33m'
-plain='\033[0m'
+# --- Color definitions ---
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+PLAIN='\033[0m'
 
 # Check root access
-[[ $EUID -ne 0 ]] && echo -e "${red}Error: ${plain} Must be root to run this script\n" && exit 1
+[[ $EUID -ne 0 ]] && echo -e "${RED}Error: ${PLAIN}Lotfan ba karbare Root vared shavid.\n" && exit 1
 
-# Check OS
-if [[ -f /etc/redhat-release ]]; then
-    release="centos"
-elif cat /etc/issue | grep -Eqi "debian"; then
-    release="debian"
-elif cat /etc/issue | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /etc/issue | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-elif cat /proc/version | grep -Eqi "debian"; then
-    release="debian"
-elif cat /proc/version | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /proc/version | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-fi
-
-# Main Menu
+# --- Main Menu Function ---
 show_menu() {
-    echo -e "
-  ${green}x-ui assistant مدیریت پنل${plain}
-  ${green}0.${plain} خروج
-  ${green}1.${plain} نصب x-ui
-  ${green}2.${plain} آپدیت x-ui
-  ${green}3.${plain} حذف x-ui
-  ${green}4.${plain} بازنشانی تنظیمات
-  ${green}5.${plain} تغییر پورت پنل
-  ${green}6.${plain} مشاهده اطلاعات پنل
-  ${green}7.${plain} فعالسازی BBR
-  "
-    echo -ne "گزینه مورد نظر را انتخاب کنید: "
+    clear
+    echo -e "${GREEN}======================================${PLAIN}"
+    echo -e "${GREEN}      X-UI PANEL ASSISTANT           ${PLAIN}"
+    echo -e "${GREEN}======================================${PLAIN}"
+    echo -e "  ${YELLOW}0.${PLAIN} Exit (Khorooj)"
+    echo -e "  ${YELLOW}1.${PLAIN} Install X-UI (Nasbe Panel)"
+    echo -e "  ${YELLOW}2.${PLAIN} Update X-UI (Update)"
+    echo -e "  ${YELLOW}3.${PLAIN} Uninstall X-UI (Hazf)"
+    echo -e "  ${YELLOW}4.${PLAIN} Reset Settings (Baz-neshani)"
+    echo -e "  ${YELLOW}5.${PLAIN} Change Port (Taghyire Port)"
+    echo -e "  ${YELLOW}6.${PLAIN} Check Panel Info (Etelaat)"
+    echo -e "  ${YELLOW}7.${PLAIN} Enable BBR (Sor-at bakhsh)"
+    echo -e "${GREEN}======================================${PLAIN}"
+    echo -ne "Yek gozine ra entekhab konid [0-7]: "
     read choice
+
     case $choice in
         0) exit 0 ;;
         1) install_xui ;;
@@ -50,14 +37,59 @@ show_menu() {
         5) change_port ;;
         6) check_info ;;
         7) enable_bbr ;;
-        *) echo -e "${red}گزینه نامعتبر${plain}" ;;
+        *) echo -e "${RED}Gozine eshtebah ast!${PLAIN}"; sleep 2; show_menu ;;
     esac
 }
 
+# --- Functions (Hamane script-e avaliye) ---
+
 install_xui() {
+    echo -e "${YELLOW}Dar hal-e nasbe x-ui...${PLAIN}"
     bash <(curl -Ls https://raw.githubusercontent.com/vaxilu/x-ui/master/install.sh)
+    back_to_menu
 }
 
-# ... سایر توابع اسکریپت مشابه این هستند ...
+update_xui() {
+    x-ui update
+    back_to_menu
+}
 
+uninstall_xui() {
+    x-ui uninstall
+    back_to_menu
+}
+
+reset_config() {
+    x-ui setting -reset
+    back_to_menu
+}
+
+change_port() {
+    read -p "Porte jadid ra vared konid: " port
+    x-ui setting -port $port
+    back_to_menu
+}
+
+check_info() {
+    x-ui show
+    back_to_menu
+}
+
+enable_bbr() {
+    echo -e "${YELLOW}Dar hal-e faalsazi BBR...${PLAIN}"
+    # In dastoor BBR ra dar akasre serverha faal mikonad
+    echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+    echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+    sysctl -p
+    echo -e "${GREEN}BBR faal shod.${PLAIN}"
+    back_to_menu
+}
+
+back_to_menu() {
+    echo -e "\n${BLUE}Amalyat tamam shod.${PLAIN}"
+    read -p "Baraye barghasht be menu [Enter] ra bezanid..."
+    show_menu
+}
+
+# Start Script
 show_menu
